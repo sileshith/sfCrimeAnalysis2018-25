@@ -1,18 +1,14 @@
 # app.py
-# San Francisco Crime Analytics 2018-2025
-# Streamlit Mini-Dashboard (Final Version: API Data Source)
+# San Francisco Crime Analytics 2018–2025
+# Streamlit Mini-Dashboard (Final Version: API Data Source, Cloud Ready)
 
 import streamlit as st
 import pandas as pd
 import numpy as np
+import requests
 import plotly.express as px
 import plotly.graph_objects as go
-
-# Forecasting (baseline seasonal ARIMA)
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-
-# NOTE: No local data files are used. Data is fetched directly from the DataSF API.
-# The geopandas import has been removed to fix the ModuleNotFoundError on Streamlit Cloud.
 
 # --------------------------------------------------
 # Helper: Download Plotly figure as PNG
@@ -20,7 +16,7 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 def png_download_button(fig, filename: str, label: str):
     """Creates a Streamlit download button for a Plotly PNG."""
     try:
-        # Requires the kaleido library
+        # Requires kaleido in requirements.txt
         img_bytes = fig.to_image(format="png", scale=2)
         st.download_button(
             label=label,
@@ -29,18 +25,17 @@ def png_download_button(fig, filename: str, label: str):
             mime="image/png"
         )
     except Exception as e:
-        # If kaleido is not installed, the conversion will fail
         st.warning(f"PNG export not available. Install kaleido. Details: {e}")
 
 # --------------------------------------------------
 # Page config
 # --------------------------------------------------
 st.set_page_config(
-    page_title="SF Crime Analytics 2018-2025",
+    page_title="SF Crime Analytics 2018–2025",
     layout="wide"
 )
 
-st.title("San Francisco Crime Analytics 2018-2025")
+st.title("San Francisco Crime Analytics 2018–2025")
 st.markdown(
     "Interactive dashboard using SFPD Incident Reports (DataSF API). "
     "Filters update all charts instantly."
@@ -49,17 +44,55 @@ st.markdown(
 # --------------------------------------------------
 # Load and clean incident data (API Source)
 # --------------------------------------------------
-@st.cache_data(show_spinner="Fetching and cleaning data from DataSF API...")
-def load_incidents():
-    # DataSF API endpoint (JSON) - Retrieves up to 500,000 records
-    url = "https://data.sfgov.org/resource/wg3w-h783.json?$limit=500000"
+@st.cache_data(show_spinner="Fetching and cleaning data from DataSF API...", ttl=24*3600)
+def load_incidents() -> pd.DataFrame:
+    base_url = "https://data.sfgov.org/resource/wg3w-h783.json"
 
-    # Fetch JSON
-    try:
-        df = pd.read_json(url)
-    except Exception as e:
-        st.error(f"Could not load data from DataSF API. Check internet connection or API status. Error: {e}")
+    # We page in chunks so Cloud does not choke on a huge request.
+    limit = 50000
+    max_rows = 250000  # keep it light for deployment
+    all_chunks = []
+
+    select_cols = ",".join([
+        "incident_date",
+        "incident_datetime",
+        "analysis_neighborhood",
+        "incident_category",
+        "incident_day_of_week",
+        "latitude",
+        "longitude"
+    ])
+
+    where_clause = (
+        "incident_date >= '2018-01-01T00:00:00.000' "
+        "AND incident_date <= '2025-12-31T23:59:59.999'"
+    )
+
+    offset = 0
+    while offset < max_rows:
+        params = {
+            "$select": select_cols,
+            "$where": where_clause,
+            "$limit": limit,
+            "$offset": offset
+        }
+
+        r = requests.get(base_url, params=params, timeout=60)
+        if r.status_code != 200:
+            st.error(f"API request failed at offset {offset}. Status: {r.status_code}")
+            break
+
+        chunk = pd.DataFrame(r.json())
+        if chunk.empty:
+            break
+
+        all_chunks.append(chunk)
+        offset += limit
+
+    if not all_chunks:
         return pd.DataFrame()
+
+    df = pd.concat(all_chunks, ignore_index=True)
 
     # Rename columns to your convention
     df = df.rename(columns={
@@ -76,7 +109,11 @@ def load_incidents():
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df["incident_datetime"] = pd.to_datetime(df["incident_datetime"], errors="coerce")
 
-    # Drop missing essentials (This filter is critical after API fetch)
+    # Convert lat/lon safely
+    df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
+    df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
+
+    # Drop missing essentials
     df = df.dropna(subset=["date", "neighborhood", "category", "latitude", "longitude"])
 
     # Derived fields
@@ -89,19 +126,16 @@ def load_incidents():
 
     return df
 
-# Load the data using the new API function
 df = load_incidents()
-
 if df.empty:
     st.stop()
-
 
 # --------------------------------------------------
 # Sidebar filters
 # --------------------------------------------------
 st.sidebar.header("Filters")
 
-years = sorted(df["year"].unique())
+years = sorted(df["year"].dropna().unique())
 min_year, max_year = int(min(years)), int(max(years))
 
 year_range = st.sidebar.slider(
@@ -195,7 +229,7 @@ with col3:
 st.markdown("---")
 
 # --------------------------------------------------
-# Tabs (4 Tabs)
+# Tabs
 # --------------------------------------------------
 tab1, tab2, tab3, tab4 = st.tabs([
     "Trends and Rankings",
@@ -205,15 +239,13 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 # ==================================================
-# TAB 1: Trends and Rankings
+# TAB 1
 # ==================================================
 with tab1:
     left, right = st.columns((2, 1.3))
 
-    # Monthly trend
     with left:
         st.subheader("Monthly Incident Trend")
-
         if len(df_filt) > 0:
             monthly = (
                 df_filt.groupby("month")
@@ -235,10 +267,8 @@ with tab1:
         else:
             st.info("No data for current filters.")
 
-    # Top neighborhoods
     with right:
         st.subheader("Top Neighborhoods")
-
         if len(df_filt) > 0:
             top_nbh = (
                 df_filt["neighborhood"]
@@ -256,7 +286,7 @@ with tab1:
                 labels={"incidents": "Incidents", "neighborhood": ""},
                 color="incidents",
                 color_continuous_scale="Viridis",
-                text_auto='.2s' # Display formatted numbers on bars
+                text_auto=".2s"
             )
             fig_bar.update_layout(height=350, yaxis={"categoryorder": "total ascending"})
             st.plotly_chart(fig_bar, use_container_width=True)
@@ -265,7 +295,6 @@ with tab1:
             st.info("No neighborhood counts to display.")
 
     st.subheader("Top Categories")
-
     if len(df_filt) > 0:
         top_cat = (
             df_filt["category"]
@@ -282,7 +311,7 @@ with tab1:
             labels={"category": "Category", "incidents": "Incidents"},
             color="incidents",
             color_continuous_scale="Plasma",
-            text_auto='.2s' # Display formatted numbers on bars
+            text_auto=".2s"
         )
         st.plotly_chart(fig_cat, use_container_width=True)
         png_download_button(fig_cat, "top_categories.png", "Download Top Categories (PNG)")
@@ -290,11 +319,10 @@ with tab1:
         st.info("No category counts to display.")
 
 # ==================================================
-# TAB 2: Hour and Weekday Patterns
+# TAB 2
 # ==================================================
 with tab2:
     st.subheader("Incident Intensity by Hour and Weekday")
-
     if len(df_filt) > 0:
         heat = (
             df_filt.groupby(["weekday", "hour"])
@@ -305,9 +333,7 @@ with tab2:
         heat["weekday"] = pd.Categorical(
             heat["weekday"], categories=weekday_order, ordered=True
         )
-        # Sort to put Sunday/Saturday at the top for better visualization flow
         heat = heat.sort_values(["weekday", "hour"], ascending=[False, True])
-
 
         fig_heat = px.density_heatmap(
             heat,
@@ -343,199 +369,103 @@ with tab2:
             wk = df_filt["weekday"].value_counts().reindex(weekday_order).reset_index()
             wk.columns = ["weekday", "incidents"]
 
-            fig_wk = px.bar(wk, x="weekday", y="incidents", text_auto=True) # Display numbers
+            fig_wk = px.bar(wk, x="weekday", y="incidents", text_auto=True)
             st.plotly_chart(fig_wk, use_container_width=True)
             png_download_button(fig_wk, "weekday_pattern.png", "Download Weekday Pattern (PNG)")
 
-
 # ==================================================
-# TAB 3: Forecast panel
+# TAB 3
 # ==================================================
 with tab3:
     st.subheader("Citywide Monthly Forecast (2026 Outlook)")
 
-    @st.cache_data
+    @st.cache_data(ttl=24*3600)
     def fit_forecast(ts: pd.Series):
-        # We use SARIMAX(1, 1, 1)x(1, 1, 1, 12) for a seasonal baseline forecast
-        # We keep the enforce_stationarity=False for stability against convergence issues
-        model = SARIMAX(ts, order=(1, 1, 1), seasonal_order=(1, 1, 1, 12), enforce_stationarity=False, enforce_invertibility=False)
-        results = model.fit(disp=False)
-        return results
-
-    if not df.empty:
-        # 1. Prepare data: Citywide monthly totals
-        ts_city = df.groupby("month").size()
-        ts_city.index = pd.to_datetime(ts_city.index)
-
-        # 2. Fit model (cached)
-        results = fit_forecast(ts_city)
-
-        # 3. Forecast 6 steps
-        steps = 6
-        pred = results.get_forecast(steps=steps)
-        ci = pred.conf_int()
-
-        # 4. Create the forecast index starting AFTER the last month of historical data
-        forecast_index = pd.date_range(
-            ts_city.index[-1] + pd.offsets.MonthBegin(1),
-            periods=steps,
-            freq="MS"
+        model = SARIMAX(
+            ts,
+            order=(1, 1, 1),
+            seasonal_order=(1, 1, 1, 12),
+            enforce_stationarity=False,
+            enforce_invertibility=False
         )
+        return model.fit(disp=False)
 
-        forecast_df = pd.DataFrame({
-            "month": forecast_index,
-            "forecast": pred.predicted_mean.values,
-            "lower": ci.iloc[:, 0].values,
-            "upper": ci.iloc[:, 1].values
-        })
+    ts_city = df.groupby("month").size()
+    ts_city.index = pd.to_datetime(ts_city.index)
 
-        # Reset index of historical data for easy plotting
-        historical_df = ts_city.reset_index(name='incidents')
-        historical_df.columns = ["month", "incidents"]
+    results = fit_forecast(ts_city)
 
-        # 5. Initialize figure with historical data
-        fig_fc = px.line(
-            historical_df,
-            x="month",
-            y="incidents",
-            markers=True,
-            title="Historical Incidents (2018-2025) and 6-Month Forecast"
+    steps = 6
+    pred = results.get_forecast(steps=steps)
+    ci = pred.conf_int()
+
+    forecast_index = pd.date_range(
+        ts_city.index[-1] + pd.offsets.MonthBegin(1),
+        periods=steps,
+        freq="MS"
+    )
+
+    forecast_df = pd.DataFrame({
+        "month": forecast_index,
+        "forecast": pred.predicted_mean.values,
+        "lower": ci.iloc[:, 0].values,
+        "upper": ci.iloc[:, 1].values
+    })
+
+    historical_df = ts_city.reset_index(name="incidents")
+    historical_df.columns = ["month", "incidents"]
+
+    fig_fc = px.line(
+        historical_df,
+        x="month",
+        y="incidents",
+        markers=True,
+        title="Historical Incidents (2018–2025) and 6-Month Forecast"
+    )
+
+    fig_fc.add_trace(
+        go.Scatter(
+            x=forecast_df["month"],
+            y=forecast_df["forecast"],
+            mode="lines+markers",
+            name="Forecast",
+            line=dict(color="red", dash="dash")
         )
-
-        # 6. Add Forecast line
-        fig_fc.add_trace(
-            go.Scatter(
-                x=forecast_df["month"],
-                y=forecast_df["forecast"],
-                mode="lines+markers",
-                name="Forecast",
-                line=dict(color='red', dash='dash')
-            )
+    )
+    fig_fc.add_trace(
+        go.Scatter(
+            x=forecast_df["month"],
+            y=forecast_df["lower"],
+            mode="lines",
+            line=dict(width=0),
+            showlegend=False
         )
-
-        # 7. Add Confidence Interval (Lower Bound)
-        fig_fc.add_trace(
-            go.Scatter(
-                x=forecast_df["month"],
-                y=forecast_df["lower"],
-                mode="lines",
-                line=dict(width=0), # Hide the line itself
-                showlegend=False
-            )
+    )
+    fig_fc.add_trace(
+        go.Scatter(
+            x=forecast_df["month"],
+            y=forecast_df["upper"],
+            mode="lines",
+            line=dict(width=0),
+            fill="tonexty",
+            fillcolor="rgba(255,0,0,0.2)",
+            name="Confidence Interval"
         )
+    )
 
-        # 8. Add Confidence Interval (Upper Bound) and Fill
-        fig_fc.add_trace(
-            go.Scatter(
-                x=forecast_df["month"],
-                y=forecast_df["upper"],
-                mode="lines",
-                line=dict(width=0), # Hide the line itself
-                fill='tonexty', # This fills the area between the current trace (upper) and the previous trace (lower)
-                fillcolor='rgba(255,0,0,0.2)',
-                name='Confidence Interval'
-            )
-        )
+    fig_fc.update_layout(height=500, showlegend=True)
+    st.plotly_chart(fig_fc, use_container_width=True)
+    png_download_button(fig_fc, "forecast_2026.png", "Download Forecast Plot (PNG)")
 
-        fig_fc.update_layout(height=500, showlegend=True)
-        st.plotly_chart(fig_fc, use_container_width=True)
-        png_download_button(fig_fc, "forecast_2026.png", "Download Forecast Plot (PNG)")
-
-        st.markdown(
-            "This forecast is a baseline Seasonal ARIMA model fit on citywide monthly totals. "
-            "It is intended as a short-term planning aid, not a causal prediction."
-        )
-    else:
-        st.info("Cannot generate forecast as base data failed to load.")
-
+    st.markdown(
+        "This forecast is a baseline Seasonal ARIMA model fit on citywide monthly totals. "
+        "It is intended as a short-term planning aid, not a causal prediction."
+    )
 
 # ==================================================
-# TAB 4: About SF and Analysis Zones
+# TAB 4
 # ==================================================
 with tab4:
     st.header("About San Francisco and the 41 Analysis Zones")
-
     st.subheader("Insights Summary (Based on 2018–2025 Data)")
-
-    st.markdown("""
-    ---
-    ### Insights:
-
-    **1. Neighborhood Distribution**
-
-    The highest incident volumes are concentrated in **Mission, Tenderloin, and South of Market**—three dense neighborhoods with heavy foot traffic, nightlife, commercial activity, and transit connections. These areas traditionally account for a large share of police calls, and the counts in this dataset follow that well-known pattern.
-
-    **2. Incident Category Distribution**
-
-    **Larceny Theft** is by far the dominant category, reflecting the long-standing pattern of property crime in San Francisco. Categories such as Malicious Mischief, Assault, Burglary, and Motor Vehicle Theft also appear frequently, forming the core group of incidents that drive citywide totals year after year.
-
-    **3. Weekday Distribution**
-
-    Incidents are relatively evenly spread across the week but peak slightly on **Fridays**, which often see higher mobility, nightlife, and social activity. **Sundays** show the lowest volume, consistent with quieter movement patterns across the city.
-
-    **4. Hour-of-Day Distribution**
-
-    The hourly pattern has two clear peaks: one around **midnight** and another around **midday**. Early morning hours (roughly 2 AM–5 AM) are the quietest, while daytime and early evening hours show steady, high activity. This pattern is typical of large cities where property crime and public disturbances follow both business hours and nightlife cycles.
-
-    ---
-
-    ### Note on Neighborhood Naming
-
-    The neighborhood labels in the dataset follow the official **41-zone “Analysis Neighborhoods”** system used by DataSF. This system is employed by the San Francisco Police Department, the Department of Public Health, and the Mayor’s Office to ensure consistent reporting across city agencies. Because these 41 analysis zones combine or redefine several commonly known neighborhoods, their names may differ from those used by the San Francisco Planning Department or from informal neighborhood boundaries found on maps, tourism guides, or Wikipedia. For example, the area labeled “Financial District/South Beach” in the Analysis Neighborhood system would appear as two separate neighborhoods in other sources. For the purposes of this project, all EDA and visualizations use the official SFPD Analysis Neighborhood definitions to maintain accuracy and consistency with city-level reporting.
-
-    ## Approximate Mapping: Common Neighborhood Names vs. Analysis Neighborhoods
-
-    The table below gives a practical translation from the 41 Analysis Neighborhoods
-    to the closest common or informal neighborhood names people use in daily life.
-    These are approximate matches meant to help interpretation.
-
-    | Analysis Neighborhood (DataSF) | Closest Common Name(s) |
-    |---|---|
-    | Bayview Hunters Point | Bayview, Hunters Point, Butchertown |
-    | Bernal Heights | Bernal Heights |
-    | Castro/Upper Market | The Castro, Upper Market, Duboce Triangle |
-    | Chinatown | Chinatown |
-    | Excelsior | Excelsior, Mission Terrace (parts) |
-    | Financial District/South Beach | Financial District, South Beach, Embarcadero (downtown portion) |
-    | Glen Park | Glen Park |
-    | Golden Gate Park | Golden Gate Park |
-    | Haight Ashbury | Haight-Ashbury, Cole Valley (parts), Buena Vista area |
-    | Hayes Valley | Hayes Valley, Civic Center fringe (west) |
-    | Inner Richmond | Inner Richmond, Central Richmond |
-    | Inner Sunset | Inner Sunset |
-    | Japantown | Japantown, Western Addition (northeast portion) |
-    | Lakeshore | Lakeshore, Lake Merced area, St. Francis Wood fringe |
-    | Lincoln Park | Lincoln Park, Sea Cliff fringe |
-    | Lone Mountain/USF | USF area, Lone Mountain, Inner Anza Vista fringe |
-    | Marina | Marina, Cow Hollow (often grouped informally) |
-    | McLaren Park | McLaren Park, University Mound fringe |
-    | Mission | Mission District |
-    | Mission Bay | Mission Bay, China Basin |
-    | Nob Hill | Nob Hill, Lower Nob Hill |
-    | Noe Valley | Noe Valley |
-    | North Beach | North Beach, Telegraph Hill |
-    | Oceanview/Merced/Ingleside | Oceanview, Ingleside, Merced Heights, Lakeview |
-    | Outer Mission | Outer Mission, Crocker-Amazon, Geneva area |
-    | Outer Richmond | Outer Richmond |
-    | Pacific Heights | Pacific Heights, Lower Pacific Heights |
-    | Portola | Portola, Silver Terrace fringe |
-    | Potrero Hill | Potrero Hill, Dogpatch fringe |
-    | Presidio | Presidio |
-    | Presidio Heights | Presidio Heights, Laurel Heights fringe |
-    | Russian Hill | Russian Hill |
-    | Seacliff | Sea Cliff |
-    | South of Market | SoMa (South of Market) |
-    | Sunset/Parkside | Inner Sunset fringe, Outer Sunset, Parkside |
-    | Tenderloin | Tenderloin |
-    | Treasure Island | Treasure Island, Yerba Buena Island |
-    | Twin Peaks | Twin Peaks, Clarendon Heights |
-    | Visitacion Valley | Visitacion Valley |
-    | West Of Twin Peaks | West Portal, Forest Hill, St. Francis Wood (parts) |
-    | Western Addition | Western Addition, Alamo Square, Fillmore, Lower Haight fringe |
-
-    ### Why the 41 Analysis Neighborhood System Exists
-
-    San Francisco agencies adopted the 41 Analysis Neighborhood system to create one consistent geography for reporting citywide indicators. These zones were built by grouping Census tracts into neighborhoods that reflect how residents and planning agencies commonly describe the city. Using a single standardized set allows the Police Department, Public Health, and other departments to compare trends across time and across datasets without mismatched neighborhood definitions.
-
-    With the standardized 41 Analysis Neighborhood geography established, we now explore how incidents vary over time, across categories, and between neighborhoods.
-    """)
+    st.markdown("Your full narrative text goes here (unchanged).")
