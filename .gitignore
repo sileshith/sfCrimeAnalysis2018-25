@@ -1,0 +1,24 @@
+# macOS system files
+.DS_Store
+*/.DS_Store
+**/.DS_Store
+
+# Excel temporary lock files
+~$*.xlsx
+~$*.xls
+~$*.pptx
+~$*.docx
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Streamlit cache
+.streamlit/
+
+# Raw data (too large for GitHub)
+*.csv
+
