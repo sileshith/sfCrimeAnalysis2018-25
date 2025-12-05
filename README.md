@@ -1,25 +1,4 @@
 <div style="
-    position: relative;
-    width: 100%;
-    min-height: 520px;
-    border-radius: 10px;
-    overflow: hidden;
-">
-
-  <!-- Use img instead of background-image -->
-  <img src="goldenGatebrge.png"
-       alt="Golden Gate Bridge"
-       style="width: 100%; height: auto; display: block;">
-
-  <!-- Dark overlay -->
-  <div style="
-      position: absolute;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: rgba(0,0,0,0.45);
-  "></div>
-
-  <!-- Centered title block -->
-  <div style="
       position: absolute;
       top: 30%;
       left: 50%;
@@ -30,13 +9,25 @@
       color: white;
       z-index: 2;
   ">
-      <div style="font-size: 42px; font-weight: 800; line-height: 1.15;">
+      <h1 style="
+          font-size: 42px;
+          font-weight: 800;
+          line-height: 1.15;
+          margin: 0;
+          padding: 0;
+      ">
           San Francisco Crime Analysis (2018-2025)
-      </div>
-      <div style="margin-top: 10px; font-size: 22px; font-weight: 500;">
+      </h1>
+
+      <h2 style="
+          font-size: 22px;
+          font-weight: 500;
+          margin-top: 10px;
+          padding: 0;
+      ">
           Forecasting, Neighborhood Patterns, and Patrol Optimization Using Python
-      </div>
-  </div>
+      </h2>
+</div>
 
   <!-- Author box -->
   <div style="
@@ -60,7 +51,7 @@
     <strong>Project:</strong> Project 2 (Python)<br>
     <strong>Professor:</strong> Dr. Neha Joshi (PhD)<br>
     <strong>Data Source:</strong> SFPD Incident Reports (DataSF)<br>
-    <strong>Time Window:</strong> 2018–2025
+    <strong>Time Window:</strong> 2018-2025
   </div>
 
   <!-- Footer text -->
@@ -83,9 +74,8 @@
 </div>
 
 
----
 
-## San Francisco Crime Analytics (2018–2025)
+## San Francisco Crime Analytics (2018-2025)
 
 A structured, end-to-end analysis of nearly one million SFPD incident reports, covering  
 **data cleaning, exploratory visualization, geospatial patterns, time-series forecasting,  
