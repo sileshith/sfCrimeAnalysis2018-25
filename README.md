@@ -1,6 +1,3 @@
-<!-- -------------------------------------------------------- -->
-<!-- COVER IMAGE (GitHub-safe version using <img>)            -->
-<!-- -------------------------------------------------------- -->
 <div style="
     position: relative;
     width: 100%;
@@ -9,16 +6,19 @@
     overflow: hidden;
 ">
 
+  <!-- Use img instead of background-image -->
   <img src="goldenGatebrge.png"
        alt="Golden Gate Bridge"
        style="width: 100%; height: auto; display: block;">
 
+  <!-- Dark overlay -->
   <div style="
       position: absolute;
       top: 0; left: 0; right: 0; bottom: 0;
       background-color: rgba(0,0,0,0.45);
   "></div>
 
+  <!-- Centered title block -->
   <div style="
       position: absolute;
       top: 30%;
@@ -31,33 +31,39 @@
       z-index: 2;
   ">
       <div style="font-size: 42px; font-weight: 800; line-height: 1.15;">
-          San Francisco Crime Analysis (2018–2025)
+          San Francisco Crime Analysis (2018-2025)
       </div>
       <div style="margin-top: 10px; font-size: 22px; font-weight: 500;">
-          Exploratory Analysis • Spatial Patterns • Forecasting • Dashboard
+          Forecasting, Neighborhood Patterns, and Patrol Optimization Using Python
       </div>
   </div>
 
+  <!-- Author box -->
   <div style="
-      position: absolute;
-      bottom: 40px;
-      left: 40px;
-      z-index: 2;
-      color: white;
-      font-size: 15px;
-      background-color: rgba(0,0,0,0.45);
-      padding: 12px 20px;
-      border-radius: 6px;
-      line-height: 1.45;
-      white-space: nowrap;
+    position: absolute;
+    bottom: 40px;
+    left: 40px;
+    z-index: 2;
+    color: white;
+    font-size: 15px;
+    line-height: 1.45;
+    background-color: rgba(0,0,0,0.45);
+    padding: 12px 20px;
+    border-radius: 6px;
+    width: auto;
+    max-width: none;
+    text-align: left;
+    white-space: nowrap;
   ">
-      <strong>Author:</strong> Sileshi Hirpa<br>
-      <strong>Course:</strong> DAT 301 (Exploring Data in R & Python)<br>
-      <strong>Institution:</strong> Arizona State University<br>
-      <strong>Data:</strong> SFPD Incident Reports, DataSF<br>
-      <strong>Years:</strong> 2018–2025
+    <strong>Author:</strong> Sileshi Hirpa<br>
+    <strong>Course:</strong> DAT 301 (Exploring Data in R &amp; Python)<br>
+    <strong>Project:</strong> Project 2 (Python)<br>
+    <strong>Professor:</strong> Dr. Neha Joshi (PhD)<br>
+    <strong>Data Source:</strong> SFPD Incident Reports (DataSF)<br>
+    <strong>Time Window:</strong> 2018–2025
   </div>
 
+  <!-- Footer text -->
   <div style="
       position: absolute;
       bottom: 40px;
@@ -68,14 +74,14 @@
       font-style: italic;
       text-align: right;
   ">
-      Fall 2025
+      Arizona State University • December 2025
   </div>
-
 </div>
 
 <div style="text-align: center; font-size: 12px; color: gray; margin-top: 6px;">
-    Cover Image Source: Britannica — “Golden Gate Bridge”
+    Cover Image Source: Britannica - “Golden Gate Bridge”
 </div>
+
 
 ---
 
@@ -144,24 +150,24 @@ The project demonstrates practical skills for real-world analytic workflows.
 
 ---
 
-# Repository Structure
-sfCrimeAnalysis2018-25/
-│
-├── project2_SH.ipynb # Full analysis notebook
-├── project2_SH.html # HTML export
-├── app.py # Streamlit dashboard
-├── goldenGatebrge.png # Cover image
-├── dashboard_charts/ # Dashboard snapshot assets
-└── Police_Department_Incident_Reports__2018_to_20251121.csv
+# Repository Structure  
+sfCrimeAnalysis2018-25/  
+│  
+├── project2_SH.ipynb # Full analysis notebook  
+├── project2_SH.html # HTML export  
+├── app.py # Streamlit dashboar   
+├── goldenGatebrge.png # Cover image   
+├── dashboard_charts/ # Dashboard snapshot assets  
+└── Police_Department_Incident_Reports__2018_to_20251121.csv  
 
 ---
 
 # Analytical Summary
 
-## 1. Citywide Trend (2018–2025)
+## 1. Citywide Trend (2018-2025)
 
 Incident volume shows a **marked decline** beginning in 2020,  
-stabilizing at lower levels through 2024–2025.
+stabilizing at lower levels through 2024-2025.
 
 Contributing factors:
 
@@ -206,10 +212,10 @@ These categories define the city's crime distribution across most years.
 ## 4. Daily and Weekly Patterns
 
 ### Hourly
-- **Quietest:** 4–6 AM  
-- **Peak:** 12–3 PM  
-- **Evening plateau:** 3–7 PM  
-- **Weekend nightlife spike:** midnight–3 AM  
+- **Quietest:** 4-6 AM  
+- **Peak:** 12-3 PM  
+- **Evening plateau:** 3-7 PM  
+- **Weekend nightlife spike:** midnight-3 AM  
 
 ### Weekdays
 - **Highest:** Wednesday and Friday  
@@ -233,7 +239,7 @@ Each neighborhood shows consistent structural patterns tied to land use.
 
 A baseline SARIMA model projects:
 
-- **3,900–4,600 incidents per month** early in 2026  
+- **3,900-4,600 incidents per month** early in 2026  
 - Roughly **41% lower** than pre-2020 levels  
 - Stable and predictable seasonal patterns  
 
@@ -244,7 +250,7 @@ No indication of a return to earlier high-volume years.
 ## 7. Dashboard Highlights
 
 ### Full Local Dashboard
-Uses all available data (2018–2025). Includes:
+Uses all available data (2018-2025). Includes:
 
 - spatial maps  
 - hourly & weekday heatmaps  
